@@ -69,6 +69,21 @@ def write_member_zarr(matches: Dict[datetime, List[ForecastFile]], variables: Li
     root.create_dataset('x', data=np.arange(nx), dtype=np.int32)
     root['x'].attrs['_ARRAY_DIMENSIONS'] = ['x']
     root.attrs['member_name'] = member
+    root.attrs['grid_type'] = 'lambert'
+    root.attrs['ni'] = grid.ni
+    root.attrs['nj'] = grid.nj
+    root.attrs['lon_0'] = grid.lon_0
+    root.attrs['lat_0'] = grid.lat_0
+    root.attrs['lat_std'] = grid.lat_std
+    root.attrs['ll_lat'] = grid.ll_lat
+    root.attrs['ll_lon'] = grid.ll_lon
+    root.attrs['ur_lat'] = grid.ur_lat
+    root.attrs['ur_lon'] = grid.ur_lon
+    root.attrs['description'] = f"Ensemble member {member} from CAM forecast data, stored in Zarr format."
+    root.attrs['source'] = "Extracted from GRIB2 files using grib2io, processed with custom Python script."
+    root.attrs['history'] = f"Created on {datetime.utcnow().isoformat()}Z by build_member_zarr.py script."
+    root.attrs['forecast_times'] = len(times)
+    root.attrs['time_lagged'] = "" ## Implement this
     
     # Variables
     compressor = Blosc(cname='zstd', clevel=5)
