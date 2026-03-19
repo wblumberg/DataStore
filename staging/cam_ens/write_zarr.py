@@ -87,6 +87,18 @@ def write_zarr_store(matches: Dict[datetime, List[ForecastFile]], variables: Lis
             'y': ('y', y_arr),
             'x': ('x', x_arr),
         }
+        attrs = {
+            'grid_type': grid.grid_type,
+            'ni': grid.ni,
+            'nj': grid.nj,
+            'lon_0': grid.lon0,
+            'lat_0': grid.lat0,
+            'lat_std': grid.lon1,
+            'll_lat': grid.ll_lat,
+            'll_lon': grid.ll_lon,
+            'ur_lat': grid.ur_lat,
+            'ur_lon': grid.ur_lon,
+        }
     )
 
     # Write to Zarr using xarray for robust metadata
