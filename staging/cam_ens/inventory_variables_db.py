@@ -22,7 +22,7 @@ def main():
 
     # Discover sample files
     files = discover_files(args.input_root, args.patterns, args.exclude_dirs)
-    sample_files = files[:10]  # More samples for better inventory
+    sample_files = files[:30]  # More samples for better inventory
 
     # Inventory variables
     variables = inventory_variables(sample_files)
