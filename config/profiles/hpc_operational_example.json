@@ -1,0 +1,69 @@
+{
+  "name": "hpc_operational_example",
+  "description": "Example operational HPC model workflow using datastore profile orchestration.",
+  "variables": {
+    "model_token": "hrrr",
+    "max_workers": 4,
+    "input_root": "/data/base/model/hrrr",
+    "lagged_output": "/data/store/ensembles/hrrr/latest_lagged.zarr",
+    "diag_output": "/data/store/diagnostics/hrrr/uh_latest.zarr"
+  },
+  "steps": [
+    {
+      "name": "download_members",
+      "action": "download_models",
+      "params": {
+        "model_token": "{model_token}",
+        "max_workers": "{max_workers}"
+      }
+    },
+    {
+      "name": "build_lagged_ensemble",
+      "action": "build_lagged_ensemble",
+      "params": {
+        "input_root": "{input_root}",
+        "output_zarr": "{lagged_output}",
+        "max_lags": 2,
+        "patterns": [
+          "*.grib2"
+        ],
+        "exclude_dirs": []
+      }
+    },
+    {
+      "name": "postprocess",
+      "action": "postprocess_ensemble",
+      "enabled": false,
+      "params": {
+        "member_zarrs": [
+          "/data/store/members/hrrr/m01.zarr",
+          "/data/store/members/hrrr/m02.zarr"
+        ],
+        "variable": "uh",
+        "output_zarr": "{diag_output}",
+        "thresholds": {
+          "uh_gt_1": 1.0
+        },
+        "percentile_probs": [
+          0.1,
+          0.5,
+          0.9
+        ],
+        "include_pmm": true,
+        "include_lpmm": true
+      }
+    },
+    {
+      "name": "submit_slurm_postprocess",
+      "action": "slurm_submit",
+      "enabled": false,
+      "params": {
+        "script": "scripts/slurm/postprocess_ensemble.sbatch",
+        "args": [
+          "/data/store/members/hrrr/m01.zarr",
+          "/data/store/members/hrrr/m02.zarr"
+        ]
+      }
+    }
+  ]
+}

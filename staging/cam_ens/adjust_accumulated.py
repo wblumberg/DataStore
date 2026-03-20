@@ -1,19 +1,13 @@
-"""
-Adjust accumulated variables for lagged members.
-"""
+"""Compatibility wrapper for datastore.pipelines.adjustments."""
 
-from datetime import datetime
-from typing import List
+from pathlib import Path
+import sys
 
-from discover_grib import ForecastFile
-from inventory_variables import VariableInfo
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SRC_ROOT = PROJECT_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 
-def adjust_accumulated_for_lagged(file: ForecastFile, base_cycle: datetime, variables: List[VariableInfo]) -> None:
-    """Adjust accumulated variables for lagged members.
-    
-    TODO: Implement subtraction of accumulated variables.
-    For lagged members, for accumulated fields, subtract the accumulated value
-    from the lagged cycle's initial forecast to make it relative to the base cycle.
-    """
-    # Placeholder
-    pass
+from datastore.pipelines.adjustments import adjust_accumulated_for_lagged
+
+__all__ = ["adjust_accumulated_for_lagged"]

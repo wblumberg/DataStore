@@ -1,0 +1,42 @@
+{
+  "name": "local_observations_example",
+  "description": "Example local observations workflow to initialize DB, ingest, and query.",
+  "variables": {
+    "db_path": "./data/observations.sqlite",
+    "obs_file": "./sample/obs.json"
+  },
+  "steps": [
+    {
+      "name": "init_database",
+      "action": "obs_init",
+      "params": {
+        "db": "{db_path}"
+      }
+    },
+    {
+      "name": "ingest_json_observations",
+      "action": "obs_ingest",
+      "params": {
+        "db": "{db_path}",
+        "obs_type": "METAR",
+        "input": [
+          "{obs_file}"
+        ],
+        "format": "json",
+        "source_name": "local_json"
+      }
+    },
+    {
+      "name": "query_latest",
+      "action": "obs_query",
+      "params": {
+        "db": "{db_path}",
+        "obs_types": [
+          "METAR"
+        ],
+        "latest_only": true,
+        "max_rows": 500
+      }
+    }
+  ]
+}
