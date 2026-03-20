@@ -99,6 +99,41 @@ def _ordered_quantile(da: xr.DataArray, q: float, dim: str) -> xr.DataArray:
     return out
 
 
+def _required_unsigned_dtype(bit_count: int) -> np.dtype:
+    if bit_count <= 8:
+        return np.dtype("uint8")
+    if bit_count <= 16:
+        return np.dtype("uint16")
+    if bit_count <= 32:
+        return np.dtype("uint32")
+    if bit_count <= 64:
+        return np.dtype("uint64")
+    raise ValueError(
+        "paintball_bitmask supports up to 64 members when packed into one integer field"
+    )
+
+
+def _resolve_paintball_dtype(
+    member_count: int,
+    output_dtype: str | np.dtype | None,
+) -> np.dtype:
+    required = _required_unsigned_dtype(member_count)
+    if output_dtype is None:
+        return required
+
+    resolved = np.dtype(output_dtype)
+    if resolved.kind != "u":
+        raise ValueError("output_dtype must be an unsigned integer dtype")
+
+    required_bits = member_count
+    available_bits = resolved.itemsize * 8
+    if available_bits < required_bits:
+        raise ValueError(
+            f"output_dtype {resolved} has {available_bits} bits, but {required_bits} are required"
+        )
+    return resolved
+
+
 @dataclass(frozen=True)
 class EnsembleDims:
     member_dim: str = "member"
@@ -212,6 +247,56 @@ def fraction_exceedance_mask(
         strict=strict,
     )
     return frac >= required_fraction
+
+
+def paintball_bitmask(
+    da: xr.DataArray,
+    threshold: float,
+    member_dim: str = "member",
+    strict: bool = False,
+    output_dtype: str | np.dtype | None = None,
+) -> xr.DataArray:
+    if member_dim not in da.dims:
+        raise ValueError(f"member_dim '{member_dim}' not found in dims {da.dims}")
+
+    member_count = int(da.sizes[member_dim])
+    if member_count < 1:
+        raise ValueError("member_dim must have at least one member")
+
+    dtype = _resolve_paintball_dtype(member_count, output_dtype)
+
+    threshold_mask = (da > threshold) if strict else (da >= threshold)
+    threshold_mask = threshold_mask.fillna(False)
+
+    if member_dim in da.coords:
+        member_values = da.coords[member_dim].values
+    else:
+        member_values = np.arange(member_count, dtype=np.int64)
+
+    weights = (np.uint64(1) << np.arange(member_count, dtype=np.uint64)).astype(dtype, copy=False)
+    bit_weights = xr.DataArray(
+        weights,
+        dims=(member_dim,),
+        coords={member_dim: member_values},
+    )
+
+    packed = (threshold_mask.astype(dtype) * bit_weights).sum(dim=member_dim, skipna=False).astype(dtype)
+    if da.name:
+        packed.name = f"{da.name}_paintball"
+
+    packed.attrs.update(
+        {
+            "diagnostic": "paintball_bitmask",
+            "paintball_member_dim": member_dim,
+            "paintball_member_count": member_count,
+            "paintball_threshold": float(threshold),
+            "paintball_strict": bool(strict),
+            "paintball_dtype": str(dtype),
+            "paintball_bit_order": "2**member_index where index follows member_dim coordinate order",
+            "paintball_members": [str(value) for value in member_values.tolist()],
+        }
+    )
+    return packed
 
 
 def rolling_window_max(
@@ -534,6 +619,7 @@ def apply_ensemble_diagnostics(
     percentile_probs: Sequence[float] | None = None,
     neighborhood_probability_requests: Sequence[dict] | None = None,
     contour_band_requests: Sequence[dict] | None = None,
+    paintball_requests: Sequence[dict] | None = None,
     include_pmm: bool = True,
     include_lpmm: bool = True,
     lpmm_radius_x: int = 10,
@@ -614,6 +700,20 @@ def apply_ensemble_diagnostics(
                 contour_value=contour_value,
                 member_dim=dims.member_dim,
                 tolerance=tol,
+            )
+
+    if paintball_requests:
+        for req in paintball_requests:
+            name = str(req["name"])
+            threshold = float(req["threshold"])
+            strict = bool(req.get("strict", False))
+            output_dtype = req.get("output_dtype", req.get("dtype"))
+            out[name] = paintball_bitmask(
+                da=da,
+                threshold=threshold,
+                member_dim=dims.member_dim,
+                strict=strict,
+                output_dtype=output_dtype,
             )
 
     if include_pmm:
@@ -707,6 +807,7 @@ def process_ensemble_to_zarr(
     percentile_probs: Sequence[float] | None = None,
     neighborhood_probability_requests: Sequence[dict] | None = None,
     contour_band_requests: Sequence[dict] | None = None,
+    paintball_requests: Sequence[dict] | None = None,
     include_pmm: bool = True,
     include_lpmm: bool = True,
     lpmm_radius_x: int = 10,
@@ -724,6 +825,7 @@ def process_ensemble_to_zarr(
         percentile_probs=percentile_probs,
         neighborhood_probability_requests=neighborhood_probability_requests,
         contour_band_requests=contour_band_requests,
+        paintball_requests=paintball_requests,
         include_pmm=include_pmm,
         include_lpmm=include_lpmm,
         lpmm_radius_x=lpmm_radius_x,
@@ -762,6 +864,9 @@ def example_usage() -> str:
         "    contour_band_requests=[\n"
         "        {'name': 'dpt70_spag_prob', 'contour_value': 70.0, 'tolerance': 0.5},\n"
         "    ],\n"
+        "    paintball_requests=[\n"
+        "        {'name': 'uh75_paintball', 'threshold': 75.0, 'strict': False},\n"
+        "    ],\n"
         ")\n"
     )
 
@@ -778,6 +883,7 @@ __all__ = [
     "exceedance_fraction",
     "decile_membership",
     "fraction_exceedance_mask",
+    "paintball_bitmask",
     "rolling_window_max",
     "neighborhood_max",
     "neighborhood_probability_exceedance",

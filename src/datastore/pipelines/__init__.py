@@ -3,6 +3,8 @@
 __all__ = [
     "build_lagged_ensemble",
     "build_member_store",
+    "discover_member_zarrs",
+    "load_lagged_member_ensemble",
     "load_member_ensemble",
     "inventory_variables_database",
     "postprocess_member_stores",
@@ -31,6 +33,18 @@ def write_member_zarr(*args, **kwargs):
 
 def build_lagged_ensemble(*args, **kwargs):
     from .lagged_ensemble import build_lagged_ensemble as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def discover_member_zarrs(*args, **kwargs):
+    from .lagged_members import discover_member_zarrs as implementation
+
+    return implementation(*args, **kwargs)
+
+
+def load_lagged_member_ensemble(*args, **kwargs):
+    from .lagged_members import load_lagged_member_ensemble as implementation
 
     return implementation(*args, **kwargs)
 
